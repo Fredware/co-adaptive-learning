@@ -1,4 +1,4 @@
-function output_ttbl = reduce_timetable(input_ttbl, task_type)
+function output_ttbl = prune_timetable(input_ttbl, task_type)
 %REDUCE_TIMETABLE Discard unused DOFs and Feature channels
 %   Detailed explanation goes here
 reduced_dofs = [1:5];
