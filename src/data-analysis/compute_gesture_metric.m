@@ -11,6 +11,8 @@ switch metric_type
         metric_vals = frm_danly_utils.compute_jerk(kin_pred, sample_rate);
     case "ptit"
         metric_vals = frm_danly_utils.compute_ptit(kin_des, kin_pred, target_radius);
+    case "maxh"
+        metric_vals = frm_danly_utils.compute_maxh(kin_des, kin_pred, target_radius, sample_rate);
 end
 weighted_metric = mean( [mean(metric_vals(1:3)), mean(metric_vals(4:5))]);
 end
