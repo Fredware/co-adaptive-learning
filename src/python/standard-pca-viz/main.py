@@ -203,6 +203,7 @@ def plot_trial_trmse(gesture_a_trmse, gesture_b_trmse):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+    
     p_id = "p_10"
     learning_cond = "cl"
     base_path = f"..\\..\\..\\temp-data\\{p_id}-{learning_cond}\\{p_id}-{learning_cond}"
