@@ -1,3 +1,7 @@
-results/
-temp-data/
+results/**
+temp-data/**
 *.asv
+.Rproj.user
+**.png
+**.pptx
+**.pdf
