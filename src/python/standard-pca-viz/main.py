@@ -117,7 +117,6 @@ def plot_trial_inferences(ax, kdf_trial, n):
         ax.plot(data.index[:n], data[col][:n], color=sns_blue, alpha=0.5, linestyle=l_style, lw=l_width)
         ax.plot(data.index[n:], data[col][n:], color=sns_red, alpha=0.5, linestyle=l_style, lw=l_width)
 
-
     for i, col in enumerate(target_cols):
         if i < len(target_cols) - 2:
             l_style = '--'
@@ -196,23 +195,37 @@ def plot_trial_trmse(gesture_a_trmse, gesture_b_trmse):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     x_ticks = np.arange(0.5, 18.5, 2)
-    x_labels = [f"T{i+1:02d}" for i in range(len(x_ticks))]
+    x_labels = [f"T{i + 1:02d}" for i in range(len(x_ticks))]
     plt.xticks(x_ticks, x_labels)
     plt.show()
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    
-    p_id = "p_10"
-    learning_cond = "cl"
+def load_dataset(p_id: str, learning_cond: str) -> dict:
+    """
+    Load the kdf files and the associated event idxs stored as starts and stops for each gesture
+    :param p_id: Participant ID
+    :param learning_cond: Learning condition (ml, cl, or hl)
+    :return:
+    """
     base_path = f"..\\..\\..\\temp-data\\{p_id}-{learning_cond}\\{p_id}-{learning_cond}"
-    trial_mats = np.load(base_path + "-kdf-mav-v.npz")
+    # trial_mats = np.load(base_path + "-kdf-mav-v.npz")
     kdf_file = pd.read_csv(base_path + "-kdf-mav.csv")
     kdf_mav_idxs = pd.read_csv(base_path + "-kdf-mav-gesture_idxs.csv")
-    sims_dmd = np.load(base_path + "-kdf-mav-sim_mat.npy")
-    with open(base_path + "-kdf-mav-gesture_labels.pkl", 'rb') as f:
-        gesture_labels = pickle.load(f)
+    # sims_dmd = np.load(base_path + "-kdf-mav-sim_mat.npy")
+    # with open(base_path + "-kdf-mav-gesture_labels.pkl", 'rb') as f:
+    #     gesture_labels = pickle.load(f)
+    dataset = dict([("mav", kdf_file), ("idxs", kdf_mav_idxs)])
+    return dataset
+
+
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+    p_id = "p_10"
+    learning_cond = "cl"
+
+    cond_dataset = load_dataset(p_id, learning_cond)
+    kdf_file = cond_dataset["mav"]
+    kdf_mav_idxs = cond_dataset["idxs"]
 
     if learning_cond == "ml":
         num_rows = 4
@@ -286,12 +299,12 @@ if __name__ == '__main__':
     axes.flat[1].set_title('Trials 1B-{}B'.format(len(gesture_a_starts)))
 
     for ax in axes.flat:
-        ax.set_xlim(1.1*xmin, 1.1*xmax)
-        ax.set_ylim(1.1*ymin, 1.1*ymax)
+        ax.set_xlim(1.1 * xmin, 1.1 * xmax)
+        ax.set_ylim(1.1 * ymin, 1.1 * ymax)
         ax.set_aspect('equal')
 
     # Create a single legend for both subplots
-    fig.legend(labels=[f'Trial {i+1}' for i in range(len(gesture_a_starts))],
+    fig.legend(labels=[f'Trial {i + 1}' for i in range(len(gesture_a_starts))],
                loc='upper left', bbox_to_anchor=(0.05, 0.9),
                ncols=len(gesture_a_starts),
                borderaxespad=0.0)
