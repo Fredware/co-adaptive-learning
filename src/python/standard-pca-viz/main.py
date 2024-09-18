@@ -208,23 +208,56 @@ def load_dataset(p_id: str, learning_cond: str) -> dict:
     :return:
     """
     base_path = f"..\\..\\..\\temp-data\\{p_id}-{learning_cond}\\{p_id}-{learning_cond}"
-    # trial_mats = np.load(base_path + "-kdf-mav-v.npz")
     kdf_file = pd.read_csv(base_path + "-kdf-mav.csv")
     kdf_mav_idxs = pd.read_csv(base_path + "-kdf-mav-gesture_idxs.csv")
-    # sims_dmd = np.load(base_path + "-kdf-mav-sim_mat.npy")
-    # with open(base_path + "-kdf-mav-gesture_labels.pkl", 'rb') as f:
-    #     gesture_labels = pickle.load(f)
-    dataset = dict([("mav", kdf_file), ("idxs", kdf_mav_idxs)])
+    dataset = dict([("kdf", kdf_file), ("idxs", kdf_mav_idxs)])
     return dataset
 
+
+def get_nth_trial_mav(dataset: dict, n: int) -> np.ndarray:
+    """
+    Takes in a dataset and returns the nth trial.
+    :param dataset: dictionary containing kdf data and corresponding event idxs
+    :param n: trial index starting from 0
+    :return: mav data as a numpy array of N x Channels
+    """
+    idxs = dataset["idxs"]
+    gesture_a_starts = idxs["gesture_a_starts_idx"].to_numpy()
+    gesture_a_ends = idxs["gesture_a_stops_idx"].to_numpy()
+    gesture_b_starts = idxs["gesture_b_starts_idx"].to_numpy()
+    gesture_b_ends = idxs["gesture_b_stops_idx"].to_numpy()
+
+    kdf = dataset["kdf"]
+    trial_start = gesture_a_starts[n]
+    trial_end = gesture_b_ends[n]
+    kdf_trial = kdf.iloc[trial_start:trial_end, :]
+    mav_cols = [col for col in kdf_trial.columns if col.startswith('MAV')]
+    mav_trial = kdf_trial[mav_cols]
+    print(mav_trial.shape)
+    return mav_trial
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     p_id = "p_10"
-    learning_cond = "cl"
+    learning_conds = ["ml", "cl", "hl"]
 
+    mav_all_conds = np.empty((0, 32))
+    for cond in learning_conds:
+        cond_dataset = load_dataset(p_id, cond)
+        if cond == "ml":
+            # Skip the zeroth trial of ML
+            mav_cond = get_nth_trial_mav(cond_dataset, 1)
+        else:
+            mav_cond = get_nth_trial_mav(cond_dataset, 0)
+        norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(mav_cond))
+        mav_all_conds = np.vstack((mav_all_conds, norm_mav))
+    pca = PCA(n_components=2)
+    pca.fit(mav_all_conds)
+    print(pca.explained_variance_ratio_, np.sum(pca.explained_variance_ratio_))
+
+    learning_cond = "cl"
     cond_dataset = load_dataset(p_id, learning_cond)
-    kdf_file = cond_dataset["mav"]
+    kdf_file = cond_dataset["kdf"]
     kdf_mav_idxs = cond_dataset["idxs"]
 
     if learning_cond == "ml":
