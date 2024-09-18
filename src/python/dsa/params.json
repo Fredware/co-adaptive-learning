@@ -1,0 +1,8 @@
+{
+  "feature_type": "mav",
+  "learning_condition": "cl",
+  "participant_id": "p_10",
+  "source_file": "kdf",
+  "save_dir_base": "..\\..\\..\\temp-data",
+  "save_dir_format": "{participant_id}-{learning_condition}"
+}

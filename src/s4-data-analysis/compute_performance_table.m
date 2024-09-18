@@ -1,4 +1,5 @@
 function y = compute_performance_table(participant_array, metric_type, metric_task)
+% Disclaimer this function is hardcoded for 9 trials
 y = [];
 trials = (1:9)';
 for i = 1:numel(participant_array)
