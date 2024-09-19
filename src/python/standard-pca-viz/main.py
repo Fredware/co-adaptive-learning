@@ -247,7 +247,7 @@ def plot_pca(ax, data, n_dim, data_color):
     :return: None
     """
     dot_size = 50
-    dot_alpha = 0.10
+    dot_alpha = 0.25
     if n_dim == 3:
         x, y, z = data[:, 0], data[:, 1], data[:, 2]
         ax.scatter(x, y, z, color=data_color, s=dot_size, alpha=dot_alpha)
@@ -258,17 +258,18 @@ def plot_pca(ax, data, n_dim, data_color):
         raise ValueError("n_dim must be 2 or 3")
 
 
-def get_pca_projection(pca_ndim, learning_conds, p_id):
+def get_pca_projection(pca_ndim, learning_conds, p_id, num_trials=1):
     mav_all_conds = np.empty((0, 32))
     for cond in learning_conds:
         cond_dataset = load_dataset(p_id, cond)
-        if cond == "ml":
-            # Skip the zeroth trial of ML
-            mav_cond = get_nth_trial_mav(cond_dataset, 1)
-        else:
-            mav_cond = get_nth_trial_mav(cond_dataset, 0)
-        norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(mav_cond))
-        mav_all_conds = np.vstack((mav_all_conds, norm_mav))
+        for trial in range(num_trials):
+            if cond == "ml":
+                # Skip the zeroth trial of ML
+                mav_cond = get_nth_trial_mav(cond_dataset, trial + 1)
+            else:
+                mav_cond = get_nth_trial_mav(cond_dataset, trial)
+            norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(mav_cond))
+            mav_all_conds = np.vstack((mav_all_conds, norm_mav))
     pca_anchor = PCA(n_components=pca_ndim)
     pca_anchor.fit(mav_all_conds)
     print(f'Axis variances: {pca_anchor.explained_variance_ratio_}')
@@ -276,43 +277,65 @@ def get_pca_projection(pca_ndim, learning_conds, p_id):
     return pca_anchor
 
 
+def get_zeroth_pca_projection(pca_ndim, p_id):
+    cond_dataset = load_dataset(p_id, 'ml')
+    mav_cond = get_nth_trial_mav(cond_dataset, 0)
+    norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(mav_cond))
+    pca_anchor = PCA(n_components=pca_ndim)
+    pca_anchor.fit(norm_mav)
+    print(f'Axis variances: {pca_anchor.explained_variance_ratio_}')
+    print(f'Total variance: {np.sum(pca_anchor.explained_variance_ratio_)}')
+    return pca_anchor
+
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    p_id = "p_10"
+    p_id = "p_05"
     learning_conds = ["ml", "cl", "hl"]
 
     pca_ndim = 2
-    mav_all_conds = np.empty((0, 32))
+    pca_anchor = get_pca_projection(pca_ndim, learning_conds, p_id, 9)
+    # pca_anchor = get_zeroth_pca_projection(pca_ndim, p_id)
+
+
+    ax_mins, ax_maxs = [float('inf')] * pca_ndim, [float('-inf')] * pca_ndim
     for cond in learning_conds:
         cond_dataset = load_dataset(p_id, cond)
-        if cond == "ml":
-            # Skip the zeroth trial of ML
-            mav_cond = get_nth_trial_mav(cond_dataset, 1)
-        else:
-            mav_cond = get_nth_trial_mav(cond_dataset, 0)
-        norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(mav_cond))
-        mav_all_conds = np.vstack((mav_all_conds, norm_mav))
-    pca_anchor = PCA(n_components=pca_ndim)
-    pca_anchor.fit(mav_all_conds)
-    print(pca_anchor.explained_variance_ratio_, np.sum(pca_anchor.explained_variance_ratio_))
+        kdf = cond_dataset["kdf"]
+        mav_cols = [col for col in kdf.columns if col.startswith('MAV')]
+        cond_mav = kdf[mav_cols]
+        norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(cond_mav))
+        projected_dataset = pca_anchor.transform(norm_mav)
+        ax_mins = [min(a, b) for a, b in zip(ax_mins, projected_dataset.min(axis=0))]
+        ax_maxs = [max(a, b) for a, b in zip(ax_maxs, projected_dataset.max(axis=0))]
 
     colors = sns.color_palette("hls", as_cmap=False, n_colors=10)
     for cond in learning_conds:
         sns.set()
         if pca_ndim == 3:
             fig, axes = plt.subplots(*(1, 2), figsize=(15, 8.5), subplot_kw={'projection': '3d'})
-        else:
+            xmin, ymin, zmin = ax_mins
+            xmax, ymax, zmax = ax_maxs
+        elif pca_ndim == 2:
             fig, axes = plt.subplots(*(1, 2), figsize=(15, 8.5))
+            xmin, ymin = ax_mins
+            xmax, ymax = ax_maxs
         fig.tight_layout()
+
+        for ax in axes.flat:
+            ax.set_xlim(xmin, xmax)
+            ax.set_ylim(ymin, ymax)
+            if pca_ndim == 3:
+                ax.set_zlim(zmin, zmax)
 
         cond_dataset = load_dataset(p_id, cond)
         for trial in range(9):
             if cond == "ml":
-                mav_trial = get_nth_trial_mav(cond_dataset, trial+1)
+                mav_trial = get_nth_trial_mav(cond_dataset, trial + 1)
             else:
                 mav_trial = get_nth_trial_mav(cond_dataset, trial)
-
-            projected_mav = pca_anchor.transform(mav_trial)
+            norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(mav_trial))
+            projected_mav = pca_anchor.transform(norm_mav)
             # TODO: write function to split projection based on gestured indices
             # Split rows evenly into two arrays
             gesture_a, gesture_b = np.array_split(projected_mav, 2)
@@ -321,8 +344,7 @@ if __name__ == '__main__':
         fig.suptitle(f'{p_id.upper()} - {cond.upper()}', fontsize=30)
         plt.show()
 
-
-    learning_cond = "cl"
+    learning_cond = "ml"
     cond_dataset = load_dataset(p_id, learning_cond)
     kdf_file = cond_dataset["kdf"]
     kdf_mav_idxs = cond_dataset["idxs"]
