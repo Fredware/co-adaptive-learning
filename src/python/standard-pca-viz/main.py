@@ -290,13 +290,12 @@ def get_zeroth_pca_projection(pca_ndim, p_id):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    p_id = "p_05"
+    p_id = "p_10"
     learning_conds = ["ml", "cl", "hl"]
 
     pca_ndim = 2
-    pca_anchor = get_pca_projection(pca_ndim, learning_conds, p_id, 9)
-    # pca_anchor = get_zeroth_pca_projection(pca_ndim, p_id)
-
+    # pca_anchor = get_pca_projection(pca_ndim, learning_conds, p_id, 9)
+    pca_anchor = get_zeroth_pca_projection(pca_ndim, p_id)
 
     ax_mins, ax_maxs = [float('inf')] * pca_ndim, [float('-inf')] * pca_ndim
     for cond in learning_conds:
@@ -306,8 +305,8 @@ if __name__ == '__main__':
         cond_mav = kdf[mav_cols]
         norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(cond_mav))
         projected_dataset = pca_anchor.transform(norm_mav)
-        ax_mins = [min(a, b) for a, b in zip(ax_mins, projected_dataset.min(axis=0))]
-        ax_maxs = [max(a, b) for a, b in zip(ax_maxs, projected_dataset.max(axis=0))]
+        ax_mins = [min(a, b) for a, b in zip(ax_mins, projected_dataset.mean(axis=0)-4*projected_dataset.std(axis=0))]
+        ax_maxs = [max(a, b) for a, b in zip(ax_maxs, projected_dataset.mean(axis=0)+4*projected_dataset.std(axis=0))]
 
     colors = sns.color_palette("hls", as_cmap=False, n_colors=10)
     for cond in learning_conds:
@@ -344,92 +343,37 @@ if __name__ == '__main__':
         fig.suptitle(f'{p_id.upper()} - {cond.upper()}', fontsize=30)
         plt.show()
 
-    learning_cond = "ml"
-    cond_dataset = load_dataset(p_id, learning_cond)
-    kdf_file = cond_dataset["kdf"]
-    kdf_mav_idxs = cond_dataset["idxs"]
-
-    if learning_cond == "ml":
-        num_rows = 4
-    else:
-        num_rows = 3
-    num_cols = 3
-
-    gesture_a_starts = kdf_mav_idxs["gesture_a_starts_idx"].to_numpy()
-    gesture_a_ends = kdf_mav_idxs["gesture_a_stops_idx"].to_numpy()
-    gesture_b_starts = kdf_mav_idxs["gesture_b_starts_idx"].to_numpy()
-    gesture_b_ends = kdf_mav_idxs["gesture_b_stops_idx"].to_numpy()
-    # Variance Plot All
-    # fig, axes = plt.subplots(*(1, 2), figsize=(15, 8.5), subplot_kw={'projection': '3d'})
-    sns.set()
-    fig, axes = plt.subplots(*(1, 2), figsize=(15, 8.5))
-    fig.tight_layout()
     colors = sns.color_palette("hls", as_cmap=False, n_colors=10)
-    xmin, xmax, ymin, ymax = float('inf'), float('-inf'), float('inf'), float('-inf')
+    for cond in learning_conds:
+        sns.set()
+        if pca_ndim == 3:
+            fig, axes = plt.subplots(*(1, 2), figsize=(15, 8.5), subplot_kw={'projection': '3d'})
+            xmin, ymin, zmin = ax_mins
+            xmax, ymax, zmax = ax_maxs
+        elif pca_ndim == 2:
+            fig, axes = plt.subplots(*(1, 2), figsize=(15, 8.5))
+            xmin, ymin = ax_mins
+            xmax, ymax = ax_maxs
+        fig.tight_layout()
 
-    for i in range(len(gesture_a_starts)):
-        trial_start = gesture_a_starts[i]
-        trial_end = gesture_b_ends[i]
-        kdf_trial = kdf_file.iloc[trial_start:trial_end, :]
-        target_cols = [col for col in kdf_trial.columns if col.startswith('Targets_')]
-        mav_cols = [col for col in kdf_trial.columns if col.startswith('MAV')]
-        trial_data = kdf_trial[target_cols + mav_cols]
+        for ax in axes.flat:
+            ax.set_xlim(xmin, xmax)
+            ax.set_ylim(ymin, ymax)
+            if pca_ndim == 3:
+                ax.set_zlim(zmin, zmax)
 
-        scaler = MinMaxScaler()
-        norm_data = scaler.fit_transform(trial_data[mav_cols])
-        scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(norm_data)
-
-        if i == 0:
-            if learning_cond == "ml":
-                pca = PCA(n_components=2)
-                pca.fit(scaled_data)
-                with open('pca_matrix.pkl', 'wb') as f:
-                    pickle.dump(pca, f)
+        cond_dataset = load_dataset(p_id, cond)
+        for trial, ax in zip([1, 9], axes.flat):
+            if cond == "ml":
+                mav_trial = get_nth_trial_mav(cond_dataset, trial)
             else:
-                with open('pca_matrix.pkl', 'rb') as f:
-                    pca = pickle.load(f)
-
-        projected_data = pca.transform(scaled_data)
-        gesture_split = (trial_end - trial_start) // 2
-
-        ax = axes.flat[0]
-        # cmap = plt.colormaps['winter']
-        # colors = cmap((np.linspace(0.25, 1, 10)))
-        gesture_data = projected_data[:gesture_split, :]
-        # x, y, z = gesture_data[:, 0], gesture_data[:, 1], gesture_data[:, 2]
-        x, y = gesture_data[:, 0], gesture_data[:, 1]
-        sns.scatterplot(x=x, y=y, color=colors[i], s=50, ax=ax)
-        xmin = min(xmin, min(x))
-        xmax = max(xmax, max(x))
-        ymin = min(ymin, min(y))
-        ymax = max(ymax, max(y))
-
-        ax = axes.flat[1]
-        # cmap = plt.colormaps['hot']
-        # colors = cmap((np.linspace(0.25, 1, 10)))
-        gesture_data = projected_data[gesture_split:, :]
-        # x, y, z = gesture_data[:, 0], gesture_data[:, 1], gesture_data[:, 2]
-        x, y = gesture_data[:, 0], gesture_data[:, 1]
-        sns.scatterplot(x=x, y=y, color=colors[i], s=50, ax=ax)
-        xmin = min(xmin, min(x))
-        xmax = max(xmax, max(x))
-        ymin = min(ymin, min(y))
-        ymax = max(ymax, max(y))
-
-    axes.flat[0].set_title('Trials 1A-{}A'.format(len(gesture_a_starts)))
-    axes.flat[1].set_title('Trials 1B-{}B'.format(len(gesture_a_starts)))
-
-    for ax in axes.flat:
-        ax.set_xlim(1.1 * xmin, 1.1 * xmax)
-        ax.set_ylim(1.1 * ymin, 1.1 * ymax)
-        ax.set_aspect('equal')
-
-    # Create a single legend for both subplots
-    fig.legend(labels=[f'Trial {i + 1}' for i in range(len(gesture_a_starts))],
-               loc='upper left', bbox_to_anchor=(0.05, 0.9),
-               ncols=len(gesture_a_starts),
-               borderaxespad=0.0)
-    fig.suptitle(f'{p_id.upper()} - {learning_cond.upper()}', fontsize=20)
-    # plt.tight_layout(rect=[0,0,0.8,1])  # Make space for the legend
-    plt.show()
+                mav_trial = get_nth_trial_mav(cond_dataset, trial-1)
+            norm_mav = StandardScaler().fit_transform(MinMaxScaler().fit_transform(mav_trial))
+            projected_mav = pca_anchor.transform(norm_mav)
+            # TODO: write function to split projection based on gestured indices
+            # Split rows evenly into two arrays
+            gesture_a, gesture_b = np.array_split(projected_mav, 2)
+            plot_pca(ax, gesture_a, pca_ndim, "#084489")
+            plot_pca(ax, gesture_b, pca_ndim, "#B21218")
+        fig.suptitle(f'{p_id.upper()} - {cond.upper()}', fontsize=30)
+        plt.show()
